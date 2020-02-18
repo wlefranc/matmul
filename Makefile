@@ -10,7 +10,8 @@ DEPS := $(OBJS:.o=.d)
 INC_DIRS := $(shell find $(SRC_DIRS) -type d)
 INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
-CPPFLAGS ?= $(INC_FLAGS) -MMD -MP -march=native -std=c++11 -O3
+OPT_LEVEL ?= -O3
+CPPFLAGS ?= $(INC_FLAGS) -MMD -MP -march=native -std=c++11 $(OPT_LEVEL)
 
 $(BUILD_DIR)/$(TARGET_EXEC): $(OBJS)
 	g++ $(OBJS) -o $@ $(LDFLAGS)
