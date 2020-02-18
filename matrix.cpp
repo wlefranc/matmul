@@ -5,8 +5,7 @@
 #include <cstring>
 #include <immintrin.h> // for sse instructions
 
-template<class T>
-Matrix<T>::Matrix(const Matrix<T>& m) : N(m.N), M(m.M), t(new T[N*M])
+Matrix::Matrix(const Matrix& m) : N(m.N), M(m.M), t(new int[N*M])
 {
     for(size_t i = 0; i < m.N; ++i)
     {
@@ -17,45 +16,42 @@ Matrix<T>::Matrix(const Matrix<T>& m) : N(m.N), M(m.M), t(new T[N*M])
     }
 }
 
-template<class T>
-Matrix<T>::Matrix(Matrix<T>&& m) : N(m.N), M(m.M), t(m.t)
+Matrix::Matrix(Matrix&& m) : N(m.N), M(m.M), t(m.t)
 {
     m.t = nullptr;
 }
 
-template<class T>
-bool Matrix<T>::operator==(const Matrix<T>& m)
+bool Matrix::operator==(const Matrix& m)
 {
 	if (N != m.N || M != m.M)
 		return false;
 
-	return memcmp(t, m.t, sizeof(T)*N*M) == 0;
+	return memcmp(t, m.t, sizeof(int)*N*M) == 0;
 
 }
 
-template<class T>
-Matrix<T> Matrix<T>::block_mult_copy_sse(const Matrix<T>& A, const Matrix<T>& B)
+Matrix Matrix::block_mult_copy_sse(const Matrix& A, const Matrix& B)
 {
     const unsigned long N = A.get_rows();
     const unsigned long M = B.get_cols();
     const unsigned long K = A.get_cols();
 
-    Matrix<T> C(N,M);
+    Matrix C(N,M);
 
     const unsigned long SM=256uL;
     const unsigned long NN=N/SM;
     const unsigned long MM=M/SM;
     const unsigned long KK=K/SM;
 
-    std::vector<std::vector< Matrix<T> >> AA(NN, std::vector<Matrix<T>>(KK, {SM,SM}));
-    std::vector<std::vector< Matrix<T> >> BB(KK, std::vector<Matrix<T>>(MM, {SM,SM}));
-    std::vector<std::vector< Matrix<T> >> CC(NN, std::vector<Matrix<T>>(MM, {SM,SM}));
+    std::vector<std::vector< Matrix >> AA(NN, std::vector<Matrix>(KK, {SM,SM}));
+    std::vector<std::vector< Matrix >> BB(KK, std::vector<Matrix>(MM, {SM,SM}));
+    std::vector<std::vector< Matrix >> CC(NN, std::vector<Matrix>(MM, {SM,SM}));
 
-    Matrix<T>::from_matrix_to_ppmatrix(A,AA,SM);
-    Matrix<T>::from_matrix_to_ppmatrix(B,BB,SM);
+    Matrix::from_matrix_to_ppmatrix(A,AA,SM);
+    Matrix::from_matrix_to_ppmatrix(B,BB,SM);
 
     unsigned long i, k;
-    T *rres, *rmul1, *rmul2;
+    int *rres, *rmul1, *rmul2;
 
     for(size_t ii = 0; ii < NN; ++ii)
     {
@@ -90,24 +86,23 @@ Matrix<T> Matrix<T>::block_mult_copy_sse(const Matrix<T>& A, const Matrix<T>& B)
 	}
     }
 
-    Matrix<T>::from_ppmatrix_to_matrix(CC,C,SM);
+    Matrix::from_ppmatrix_to_matrix(CC,C,SM);
 
     return C;
 }
 
-template<class T>
-Matrix<T> Matrix<T>::block_mult_inplace(const Matrix<T>& A, const Matrix<T>& B)
+Matrix Matrix::block_mult_inplace(const Matrix& A, const Matrix& B)
 {
     const unsigned long N = A.get_rows();
     const unsigned long M = B.get_cols();
     const unsigned long K = A.get_cols();
 
-    Matrix<T> C(N,M);
+    Matrix C(N,M);
 
     const unsigned long SM = 256uL;
 
     unsigned long i,k;
-    T *rres,*rmul1,*rmul2;
+    int *rres,*rmul1,*rmul2;
 
     for(size_t ii = 0; ii < N; ii += SM)
     {
@@ -134,9 +129,8 @@ Matrix<T> Matrix<T>::block_mult_inplace(const Matrix<T>& A, const Matrix<T>& B)
     return C;
 }
 
-template<class T>
-void Matrix<T>::from_matrix_to_ppmatrix(const Matrix<T>& M,
-                                     std::vector<std::vector<Matrix<T>>>& MM,
+void Matrix::from_matrix_to_ppmatrix(const Matrix& M,
+                                     std::vector<std::vector<Matrix>>& MM,
                                      unsigned long SM)
 {
     const unsigned long N = M.get_rows();
@@ -148,15 +142,14 @@ void Matrix<T>::from_matrix_to_ppmatrix(const Matrix<T>& M,
         {
             auto ii = i/SM, jj = j/SM;
             auto i2 = i%SM, j2 = j%SM;
-            Matrix<T>& m = MM[ii][jj];
+            Matrix& m = MM[ii][jj];
 	    m(i2,j2) = M(i,j);
         }
     }
 }
 
-template<class T>
-void Matrix<T>::from_ppmatrix_to_matrix(const std::vector<std::vector<Matrix<T>>>& MM,
-                                     Matrix<T>& M,
+void Matrix::from_ppmatrix_to_matrix(const std::vector<std::vector<Matrix>>& MM,
+                                     Matrix& M,
                                      unsigned long SM)
 {
     const unsigned long N = M.get_rows();
@@ -168,35 +161,34 @@ void Matrix<T>::from_ppmatrix_to_matrix(const std::vector<std::vector<Matrix<T>>
         {
             auto ii = i/SM, jj = j/SM;
             auto i2 = i%SM, j2= j%SM;
-            const Matrix<T>& m = MM[ii][jj];
+            const Matrix& m = MM[ii][jj];
 	    M(i,j) = m(i2,j2);
         }
     }
 }
 
-template<class T>
-Matrix<T> Matrix<T>::block_mult_copy(const Matrix<T>& A,const Matrix<T>& B)
+Matrix Matrix::block_mult_copy(const Matrix& A,const Matrix& B)
 {
     const unsigned long N = A.get_rows();
     const unsigned long M = B.get_cols();
     const unsigned long K = A.get_cols();
 
-    Matrix<T> C(N,M);
+    Matrix C(N,M);
 
     const unsigned long SM=256uL;
     const unsigned long NN=N/SM;
     const unsigned long MM=M/SM;
     const unsigned long KK=K/SM;
 
-    std::vector<std::vector< Matrix<T> >> AA(NN, std::vector<Matrix<T>>(KK, {SM,SM}));
-    std::vector<std::vector< Matrix<T> >> BB(KK, std::vector<Matrix<T>>(MM, {SM,SM}));
-    std::vector<std::vector< Matrix<T> >> CC(NN, std::vector<Matrix<T>>(MM, {SM,SM}));
+    std::vector<std::vector< Matrix >> AA(NN, std::vector<Matrix>(KK, {SM,SM}));
+    std::vector<std::vector< Matrix >> BB(KK, std::vector<Matrix>(MM, {SM,SM}));
+    std::vector<std::vector< Matrix >> CC(NN, std::vector<Matrix>(MM, {SM,SM}));
 
-    Matrix<T>::from_matrix_to_ppmatrix(A,AA,SM);
-    Matrix<T>::from_matrix_to_ppmatrix(B,BB,SM);
+    Matrix::from_matrix_to_ppmatrix(A,AA,SM);
+    Matrix::from_matrix_to_ppmatrix(B,BB,SM);
 
     unsigned long i,k;
-    T *rres,*rmul1,*rmul2;
+    int *rres,*rmul1,*rmul2;
 
     for(size_t ii = 0; ii < NN; ++ii)
     {
@@ -220,13 +212,12 @@ Matrix<T> Matrix<T>::block_mult_copy(const Matrix<T>& A,const Matrix<T>& B)
 	}
     }
 
-    Matrix<T>::from_ppmatrix_to_matrix(CC,C,SM);
+    Matrix::from_ppmatrix_to_matrix(CC,C,SM);
 
     return C;
 }
 
-template<class T>
-Matrix<T> Matrix<T>::basic_mult(const Matrix<T>& A,const Matrix<T>& B)
+Matrix Matrix::basic_mult(const Matrix& A,const Matrix& B)
 {
     const unsigned long N = A.get_rows();
     const unsigned long M = B.get_cols();
@@ -242,8 +233,7 @@ Matrix<T> Matrix<T>::basic_mult(const Matrix<T>& A,const Matrix<T>& B)
     return C;
 }
 
-template<class T>
-void Matrix<T>::dump(std::ostream& os) const
+void Matrix::dump(std::ostream& os) const
 {
 	for(size_t i = 0; i < N; ++i)
 	{
