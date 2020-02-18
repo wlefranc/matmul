@@ -15,7 +15,7 @@ Try modifying the optimization level by changing the OPT_LEVEL variable in the M
 There should not be much difference between block_mult_copy and block_mult_copy_sse with -O3 activated as gcc automatically uses
 vectorization at this level of optimization. But there is a huge difference when using -02.
 
-Here are the results with -O2 on two 4096*4096 matrices:
+Here are the results with -O2 on two 4096*4096 matrices (with an Intel i3-3227U, 1.90GHz CPU)
 - Time taken for block_mult_inplace: 148.28s
 - Time taken for block_mult_copy: 116.52s
 - Time taken for block_mult_copy_sse: 37.31s
