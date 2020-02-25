@@ -16,11 +16,13 @@ There should not be much difference between block_mult_copy and block_mult_copy_
 vectorization at this level of optimization. But there is a huge difference when using -02.
 
 Here are the results with -O2 on two 4096*4096 matrices (with an Intel i3-3227U, 1.90GHz CPU)
+- Time taken for basic_mult: 17.8mn
 - Time taken for block_mult_inplace: 148.28s
 - Time taken for block_mult_copy: 116.52s
 - Time taken for block_mult_copy_sse: 37.31s
 
 With -O3:
+- Time taken for basic_mult: 18mn
 - Time taken for block_mult_inplace: 62.92s
 - Time taken for block_mult_copy: 32.31s
 - Time taken for block_mult_copy_sse: 30.05s
