@@ -26,3 +26,4 @@ With -O3:
 - Time taken for block_mult_inplace: 62.92s
 - Time taken for block_mult_copy: 32.31s
 - Time taken for block_mult_copy_sse: 30.05s
+- Time taken for block_mult_parallel with 4 threads: 11.7s
