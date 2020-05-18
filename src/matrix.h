@@ -46,6 +46,7 @@ public:
     static Matrix block_mult_inplace(const Matrix& A, const Matrix& B);
     static Matrix block_mult_copy(const Matrix& A, const Matrix& B);
     static Matrix block_mult_copy_sse(const Matrix& A, const Matrix& B);
+    static Matrix block_mult_parallel(const Matrix& A, const Matrix& B);
 
     static void from_matrix_to_ppmatrix(const Matrix& M, std::vector<std::vector<Matrix>>& MM, unsigned long SM);
     static void from_ppmatrix_to_matrix(const std::vector<std::vector<Matrix>>& MM, Matrix& M, unsigned long SM);

@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstring>
 #include <immintrin.h> // for sse instructions
+#include "block_multiplier.h"
 
 Matrix::Matrix(const Matrix& m) : N(m.N), M(m.M), t(new int[N*M])
 {
@@ -38,10 +39,10 @@ Matrix Matrix::block_mult_copy_sse(const Matrix& A, const Matrix& B)
 
     Matrix C(N,M);
 
-    const unsigned long SM=256uL;
-    const unsigned long NN=N/SM;
-    const unsigned long MM=M/SM;
-    const unsigned long KK=K/SM;
+    const unsigned long SM = 256;
+    const unsigned long NN = ceil(static_cast<double>(N)/static_cast<double>(SM));
+    const unsigned long MM = ceil(static_cast<double>(M)/static_cast<double>(SM));
+    const unsigned long KK = ceil(static_cast<double>(K)/static_cast<double>(SM));
 
     std::vector<std::vector< Matrix >> AA(NN, std::vector<Matrix>(KK, {SM,SM}));
     std::vector<std::vector< Matrix >> BB(KK, std::vector<Matrix>(MM, {SM,SM}));
@@ -75,10 +76,7 @@ Matrix Matrix::block_mult_copy_sse(const Matrix& A, const Matrix& B)
 			    ++simd_res, ++simd_rmul2, j += 4)
 			{
 				auto mult = _mm_mullo_epi32(_mm_set1_epi32(rmul1[k]), *simd_rmul2);
-				//auto add = _mm_add_epi32(*simd_res, mult); 
 				*simd_res = _mm_add_epi32(*simd_res, mult); 
-
-				//_mm_store_si128(simd_res, add);
 			}
 		    }
 		}
@@ -99,7 +97,7 @@ Matrix Matrix::block_mult_inplace(const Matrix& A, const Matrix& B)
 
     Matrix C(N,M);
 
-    const unsigned long SM = 256uL;
+    const unsigned long SM = 256;
 
     unsigned long i,k;
     int *rres,*rmul1,*rmul2;
@@ -111,15 +109,19 @@ Matrix Matrix::block_mult_inplace(const Matrix& A, const Matrix& B)
             for(size_t kk = 0; kk < K; kk += SM)
 	    {
                 for(i = 0, rres = &C.t[ii*M+jj], rmul1 = &A.t[ii*K+kk];
+                    //ii+i < N && i < SM;
                     i < SM;
                     ++i, rres += M, rmul1 += K)
 		{
                     for(k = 0, rmul2 = &B.t[kk*M+jj];
+                        //kk+k < K && k < SM;
                         k < SM;
                         ++k, rmul2 += N)
 		    {
-                        for(size_t j = 0; j < SM; ++j)
+                        for(size_t j = 0; /*jj+j < M &&*/ j < SM; ++j)
+			{
                             rres[j] += rmul1[k] * rmul2[j];
+			}
 		    }
 		}
 	    }
@@ -167,7 +169,7 @@ void Matrix::from_ppmatrix_to_matrix(const std::vector<std::vector<Matrix>>& MM,
     }
 }
 
-Matrix Matrix::block_mult_copy(const Matrix& A,const Matrix& B)
+Matrix Matrix::block_mult_parallel(const Matrix& A, const Matrix& B)
 {
     const unsigned long N = A.get_rows();
     const unsigned long M = B.get_cols();
@@ -175,10 +177,46 @@ Matrix Matrix::block_mult_copy(const Matrix& A,const Matrix& B)
 
     Matrix C(N,M);
 
-    const unsigned long SM=256uL;
-    const unsigned long NN=N/SM;
-    const unsigned long MM=M/SM;
-    const unsigned long KK=K/SM;
+    const unsigned long SM = 256;
+    const unsigned long NN = ceil(static_cast<double>(N)/static_cast<double>(SM));
+    const unsigned long MM = ceil(static_cast<double>(M)/static_cast<double>(SM));
+    const unsigned long KK = ceil(static_cast<double>(K)/static_cast<double>(SM));
+
+    std::vector<std::vector< Matrix >> AA(NN, std::vector<Matrix>(KK, {SM,SM}));
+    std::vector<std::vector< Matrix >> BB(KK, std::vector<Matrix>(MM, {SM,SM}));
+    std::vector<std::vector< Matrix >> CC(NN, std::vector<Matrix>(MM, {SM,SM}));
+
+    Matrix::from_matrix_to_ppmatrix(A,AA,SM);
+    Matrix::from_matrix_to_ppmatrix(B,BB,SM);
+
+    BlockMultiplier multiplier(CC, AA, BB);
+    multiplier.create_threads();
+    for(size_t ii = 0; ii < NN; ++ii)
+    {
+        for(size_t jj = 0; jj < MM; ++jj)
+        {        
+            multiplier.add_block(ii, jj);
+	}
+    }
+    multiplier.join();
+
+    Matrix::from_ppmatrix_to_matrix(CC,C,SM);
+
+    return C;
+}
+
+Matrix Matrix::block_mult_copy(const Matrix& A, const Matrix& B)
+{
+    const unsigned long N = A.get_rows();
+    const unsigned long M = B.get_cols();
+    const unsigned long K = A.get_cols();
+
+    Matrix C(N,M);
+
+    const unsigned long SM = 256;
+    const unsigned long NN = ceil(static_cast<double>(N)/static_cast<double>(SM));
+    const unsigned long MM = ceil(static_cast<double>(M)/static_cast<double>(SM));
+    const unsigned long KK = ceil(static_cast<double>(K)/static_cast<double>(SM));
 
     std::vector<std::vector< Matrix >> AA(NN, std::vector<Matrix>(KK, {SM,SM}));
     std::vector<std::vector< Matrix >> BB(KK, std::vector<Matrix>(MM, {SM,SM}));
@@ -197,14 +235,16 @@ Matrix Matrix::block_mult_copy(const Matrix& A,const Matrix& B)
             for(size_t kk = 0; kk < KK; ++kk)
 	    {
                 for(i = 0, rres = CC[ii][jj].t, rmul1 = AA[ii][kk].t;
+                    //ii+i < N && i < SM;
                     i < SM;
                     ++i, rres += SM, rmul1 += SM)
 		{
                     for(k = 0, rmul2 = BB[kk][jj].t;
+                        //kk+k < K && k < SM;
                         k < SM;
                         ++k, rmul2 += SM)
 		    {
-                        for(size_t j = 0; j < SM; ++j)
+                        for(size_t j = 0; /*jj+j < M &&*/ j < SM; ++j)
                             rres[j] += rmul1[k] * rmul2[j];
 		    }
 		}
